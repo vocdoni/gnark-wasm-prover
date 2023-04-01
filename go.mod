@@ -1,4 +1,4 @@
-module gprover
+module github.com/vocdoni/gnark-wasm-prover
 
 go 1.20
 

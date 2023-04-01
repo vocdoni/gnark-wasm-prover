@@ -14,8 +14,8 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr/iop"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr/kzg"
 	fiatshamir "github.com/consensys/gnark-crypto/fiat-shamir"
-	"github.com/consensys/gnark/backend/witness"
 	cs "github.com/consensys/gnark/constraint/bn254"
+	"github.com/vocdoni/gnark-wasm-prover/witness"
 )
 
 type Proof struct {
@@ -35,7 +35,7 @@ type Proof struct {
 	ZShiftedOpening kzg.OpeningProof
 }
 
-func Prove(spr *cs.SparseR1CS, pk *ProvingKey, fullWitness witness.Witness) (*Proof, error) {
+func Prove(spr *cs.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witness) (*Proof, error) {
 	start := time.Now()
 	// pick a hash function that will be used to derive the challenges
 	hFunc := sha256.New()
