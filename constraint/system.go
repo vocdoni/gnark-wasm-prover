@@ -19,12 +19,12 @@ type ConstraintSystem interface {
 
 	// IsSolved returns nil if given witness solves the constraint system and error otherwise
 	// Deprecated: use _, err := Solve(...) instead
-	IsSolved(witness witness.Witness, opts ...solver.Option) error
+	IsSolved(witness *witness.Witness, opts ...solver.Option) error
 
 	// Solve attempts to solves the constraint system using provided witness.
 	// Returns an error if the witness does not allow all the constraints to be satisfied.
 	// Returns a typed solution (R1CSSolution or SparseR1CSSolution) and nil otherwise.
-	Solve(witness witness.Witness, opts ...solver.Option) (any, error)
+	Solve(witness *witness.Witness, opts ...solver.Option) (any, error)
 
 	// GetNbVariables return number of internal, secret and public Variables
 	// Deprecated: use GetNbSecretVariables() instead
