@@ -17,19 +17,20 @@
 package csbn254
 
 import (
+	"encoding/gob"
 	"fmt"
-	"github.com/vocdoni/gnark-crypto-bn254/ecc"
-	"github.com/fxamacker/cbor/v2"
 	"io"
 	"math"
 	"runtime"
 	"sync"
 	"time"
 
-	"github.com/vocdoni/gnark-wasm-prover/witness"
+	"github.com/vocdoni/gnark-crypto-bn254/ecc"
+
 	"github.com/vocdoni/gnark-wasm-prover/constraint"
 	"github.com/vocdoni/gnark-wasm-prover/constraint/solver"
 	"github.com/vocdoni/gnark-wasm-prover/utils"
+	"github.com/vocdoni/gnark-wasm-prover/witness"
 
 	"github.com/vocdoni/gnark-crypto-bn254/ecc/bn254/fr"
 )
@@ -479,38 +480,26 @@ func (cs *SparseR1CS) CurveID() ecc.ID {
 // WriteTo encodes SparseR1CS into provided io.Writer using cbor
 func (cs *SparseR1CS) WriteTo(w io.Writer) (int64, error) {
 	_w := utils.WriterCounter{W: w} // wraps writer to count the bytes written
-	enc, err := cbor.CoreDetEncOptions().EncMode()
-	if err != nil {
-		return 0, err
-	}
-	encoder := enc.NewEncoder(&_w)
-
+	encoder := gob.NewEncoder(&_w)
 	// encode our object
-	err = encoder.Encode(cs)
-	return _w.N, err
+	return _w.N, encoder.Encode(cs)
 }
 
 // ReadFrom attempts to decode SparseR1CS from io.Reader using cbor
 func (cs *SparseR1CS) ReadFrom(r io.Reader) (int64, error) {
-	dm, err := cbor.DecOptions{
-		MaxArrayElements: 134217728,
-		MaxMapPairs:      134217728,
-	}.DecMode()
-	if err != nil {
-		return 0, err
-	}
-	decoder := dm.NewDecoder(r)
-
+	_r := utils.ReaderCounter{R: r} // wraps reader to count the bytes written
+	decoder := gob.NewDecoder(&_r)
+	
 	// initialize coeff table
 	cs.CoeffTable = newCoeffTable(0)
-
-	if err := decoder.Decode(cs); err != nil {
-		return int64(decoder.NumBytesRead()), err
+	
+	if err := decoder.Decode(cs); err != nil {	
+		return _r.N, err
 	}
 
 	if err := cs.CheckSerializationHeader(); err != nil {
-		return int64(decoder.NumBytesRead()), err
+		return _r.N, err
 	}
-
-	return int64(decoder.NumBytesRead()), nil
+	
+	return _r.N, nil
 }

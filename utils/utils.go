@@ -91,3 +91,14 @@ func (w *WriterCounter) Write(p []byte) (n int, err error) {
 	w.N += int64(n)
 	return
 }
+
+type ReaderCounter struct {
+	R io.Reader
+	N int64
+}
+
+func (cr *ReaderCounter) Read(p []byte) (int, error) {
+	n, err := cr.R.Read(p)
+	cr.N += int64(n)
+	return n, err
+}
