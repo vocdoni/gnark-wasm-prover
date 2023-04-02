@@ -21,11 +21,8 @@ import (
 	"fmt"
 	"github.com/vocdoni/gnark-wasm-prover/constraint"
 	"github.com/vocdoni/gnark-wasm-prover/constraint/solver"
-	"github.com/consensys/gnark/debug"
 	"io"
 	"math/big"
-	"strconv"
-	"strings"
 	"sync/atomic"
 
 	"github.com/vocdoni/gnark-crypto-bn254/ecc/bn254/fr"
@@ -38,7 +35,6 @@ type solution struct {
 	solved               []bool
 	nbSolved             uint64
 	mHintsFunctions      map[solver.HintID]solver.Hint // maps hintID to hint function
-	st                   *debug.SymbolTable
 	cs                   *constraint.System
 }
 
@@ -46,7 +42,6 @@ func newSolution(cs *constraint.System, nbWires int, hintFunctions map[solver.Hi
 
 	s := solution{
 		cs:              cs,
-		st:              &cs.SymbolTable,
 		values:          make([]fr.Element, nbWires),
 		coefficients:    coefficients,
 		solved:          make([]bool, nbWires),
@@ -260,22 +255,6 @@ func (s *solution) logValue(log constraint.LogEntry) string {
 			toResolve = append(toResolve, eval.String())
 		}
 
-	}
-	if len(log.Stack) > 0 {
-		var sbb strings.Builder
-		for _, lID := range log.Stack {
-			location := s.st.Locations[lID]
-			function := s.st.Functions[location.FunctionID]
-
-			sbb.WriteString(function.Name)
-			sbb.WriteByte('\n')
-			sbb.WriteByte('\t')
-			sbb.WriteString(function.Filename)
-			sbb.WriteByte(':')
-			sbb.WriteString(strconv.Itoa(int(location.Line)))
-			sbb.WriteByte('\n')
-		}
-		toResolve = append(toResolve, sbb.String())
 	}
 	return fmt.Sprintf(log.Format, toResolve...)
 }

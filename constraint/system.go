@@ -5,7 +5,6 @@ import (
 	"io"
 	"math/big"
 
-	"github.com/consensys/gnark/debug"
 	"github.com/vocdoni/gnark-crypto-bn254/ecc"
 	"github.com/vocdoni/gnark-wasm-prover/constraint/solver"
 	"github.com/vocdoni/gnark-wasm-prover/utils"
@@ -90,8 +89,7 @@ type System struct {
 
 	// debug info contains stack trace (including line number) of a call to a system.API that
 	// results in an unsolved constraint
-	DebugInfo   []LogEntry
-	SymbolTable debug.SymbolTable
+	DebugInfo []LogEntry
 	// maps constraint id to debugInfo id
 	// several constraints may point to the same debug info
 	MDebug map[int]int
@@ -123,7 +121,6 @@ type System struct {
 // NewSystem initialize the common structure among constraint system
 func NewSystem(scalarField *big.Int) System {
 	return System{
-		SymbolTable:        debug.NewSymbolTable(),
 		MDebug:             map[int]int{},
 		GnarkVersion:       "bn254-plonk-wasm-prover",
 		ScalarField:        scalarField.Text(16),

@@ -35,8 +35,5 @@ func (system *System) NewDebugInfo(errName string, i ...interface{}) DebugInfo {
 	sbb.WriteString("%s\n") // some space for the stack.
 	l.Format = sbb.String()
 
-	// get the stack
-	l.Stack = system.SymbolTable.CollectStack()
-
 	return DebugInfo(l)
 }
