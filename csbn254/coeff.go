@@ -17,10 +17,10 @@
 package csbn254
 
 import (
-	"github.com/consensys/gnark/constraint"
+	"github.com/vocdoni/gnark-wasm-prover/constraint"
 	"math/big"
 
-	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+	"github.com/vocdoni/gnark-crypto-bn254/ecc/bn254/fr"
 	"github.com/vocdoni/gnark-wasm-prover/utils"
 )
 

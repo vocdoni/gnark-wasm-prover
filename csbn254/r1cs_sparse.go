@@ -18,7 +18,7 @@ package csbn254
 
 import (
 	"fmt"
-	"github.com/consensys/gnark-crypto/ecc"
+	"github.com/vocdoni/gnark-crypto-bn254/ecc"
 	"github.com/fxamacker/cbor/v2"
 	"io"
 	"math"
@@ -31,7 +31,7 @@ import (
 	"github.com/vocdoni/gnark-wasm-prover/constraint/solver"
 	"github.com/vocdoni/gnark-wasm-prover/utils"
 
-	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+	"github.com/vocdoni/gnark-crypto-bn254/ecc/bn254/fr"
 )
 
 // SparseR1CS represents a Plonk like circuit

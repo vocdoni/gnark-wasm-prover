@@ -15,12 +15,12 @@
 package prover
 
 import (
-	curve "github.com/consensys/gnark-crypto/ecc/bn254"
+	curve "github.com/vocdoni/gnark-crypto-bn254/ecc/bn254"
 
 	"errors"
 	"io"
 
-	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+	"github.com/vocdoni/gnark-crypto-bn254/ecc/bn254/fr"
 )
 
 // WriteTo writes binary encoding of Proof to w without point compression

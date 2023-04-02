@@ -5,10 +5,8 @@ import (
 	"io"
 	"math/big"
 
-	"github.com/blang/semver/v4"
-	"github.com/consensys/gnark"
-	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark/debug"
+	"github.com/vocdoni/gnark-crypto-bn254/ecc"
 	"github.com/vocdoni/gnark-wasm-prover/constraint/solver"
 	"github.com/vocdoni/gnark-wasm-prover/utils"
 	"github.com/vocdoni/gnark-wasm-prover/witness"
@@ -127,7 +125,7 @@ func NewSystem(scalarField *big.Int) System {
 	return System{
 		SymbolTable:        debug.NewSymbolTable(),
 		MDebug:             map[int]int{},
-		GnarkVersion:       gnark.Version.String(),
+		GnarkVersion:       "bn254-plonk-wasm-prover",
 		ScalarField:        scalarField.Text(16),
 		MHints:             make(map[int]int),
 		MHintsDependencies: make(map[solver.HintID]string),
@@ -151,17 +149,6 @@ func (system *System) GetNbInternalVariables() int {
 //
 // This is meant to be use at the deserialization step, and will error for illegal values
 func (system *System) CheckSerializationHeader() error {
-	// check gnark version
-	binaryVersion := gnark.Version
-	objectVersion, err := semver.Parse(system.GnarkVersion)
-	if err != nil {
-		return fmt.Errorf("when parsing gnark version: %w", err)
-	}
-
-	if binaryVersion.Compare(objectVersion) != 0 {
-		fmt.Println("gnark version (binary) mismatch with constraint system")
-	}
-
 	// TODO @gbotrel maintain version changes and compare versions properly
 	// (ie if major didn't change,we shouldn't have a compatibility issue)
 

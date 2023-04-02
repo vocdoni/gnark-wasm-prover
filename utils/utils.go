@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"reflect"
 
-	"github.com/consensys/gnark-crypto/ecc"
+	"github.com/vocdoni/gnark-crypto-bn254/ecc"
 )
 
 func FieldToCurve(q *big.Int) ecc.ID {

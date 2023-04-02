@@ -17,13 +17,13 @@ package prover
 import (
 	"errors"
 
-	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
-	"github.com/consensys/gnark-crypto/ecc/bn254/fr/fft"
-	"github.com/consensys/gnark-crypto/ecc/bn254/fr/iop"
-	"github.com/consensys/gnark-crypto/ecc/bn254/fr/kzg"
-	cs "github.com/consensys/gnark/constraint/bn254"
+	"github.com/vocdoni/gnark-crypto-bn254/ecc/bn254/fr"
+	"github.com/vocdoni/gnark-crypto-bn254/ecc/bn254/fr/fft"
+	"github.com/vocdoni/gnark-crypto-bn254/ecc/bn254/fr/iop"
+	"github.com/vocdoni/gnark-crypto-bn254/ecc/bn254/fr/kzg"
+	cs "github.com/vocdoni/gnark-wasm-prover/csbn254"
 
-	kzgg "github.com/consensys/gnark-crypto/kzg"
+	kzgg "github.com/vocdoni/gnark-crypto-bn254/kzg"
 )
 
 // ProvingKey stores the data needed to generate a proof:
