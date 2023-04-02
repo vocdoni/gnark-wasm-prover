@@ -17,7 +17,6 @@
 package csbn254
 
 import (
-	"encoding/gob"
 	"fmt"
 	"io"
 	"math"
@@ -29,8 +28,8 @@ import (
 
 	"github.com/vocdoni/gnark-wasm-prover/constraint"
 	"github.com/vocdoni/gnark-wasm-prover/constraint/solver"
-	"github.com/vocdoni/gnark-wasm-prover/utils"
 	"github.com/vocdoni/gnark-wasm-prover/witness"
+	"github.com/vocdoni/gnark-wasm-prover/encoder"
 
 	"github.com/vocdoni/gnark-crypto-bn254/ecc/bn254/fr"
 )
@@ -479,27 +478,23 @@ func (cs *SparseR1CS) CurveID() ecc.ID {
 
 // WriteTo encodes SparseR1CS into provided io.Writer using cbor
 func (cs *SparseR1CS) WriteTo(w io.Writer) (int64, error) {
-	_w := utils.WriterCounter{W: w} // wraps writer to count the bytes written
-	encoder := gob.NewEncoder(&_w)
-	// encode our object
-	return _w.N, encoder.Encode(cs)
+	return encoder.EncodeToGob(w, cs)
 }
 
 // ReadFrom attempts to decode SparseR1CS from io.Reader using cbor
 func (cs *SparseR1CS) ReadFrom(r io.Reader) (int64, error) {
-	_r := utils.ReaderCounter{R: r} // wraps reader to count the bytes written
-	decoder := gob.NewDecoder(&_r)
 	
 	// initialize coeff table
 	cs.CoeffTable = newCoeffTable(0)
-	
-	if err := decoder.Decode(cs); err != nil {	
-		return _r.N, err
+	 
+	n, err := encoder.DecodeFromGob(r, cs)
+	if err != nil { 	
+		return n, err
 	}
 
 	if err := cs.CheckSerializationHeader(); err != nil {
-		return _r.N, err
+		return n, err
 	}
 	
-	return _r.N, nil
+	return n, nil
 }
