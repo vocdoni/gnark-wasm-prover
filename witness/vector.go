@@ -7,20 +7,17 @@ import (
 
 	"github.com/consensys/gnark-crypto/ecc"
 	fr_bn254 "github.com/consensys/gnark-crypto/ecc/bn254/fr"
+	"github.com/vocdoni/gnark-wasm-prover/utils"
 )
 
 func newVector(field *big.Int, size int) (any, error) {
-	curveID := fieldToCurve(field)
+	curveID := utils.FieldToCurve(field)
 	switch curveID {
 	case ecc.BN254:
 		return make(fr_bn254.Vector, size), nil
 	default:
 		return nil, errors.New("unsupported modulus")
 	}
-}
-
-func fieldToCurve(q *big.Int) ecc.ID {
-	return ecc.BN254
 }
 
 func newFrom(from any, n int) (any, error) {

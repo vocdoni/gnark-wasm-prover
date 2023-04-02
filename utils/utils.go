@@ -1,10 +1,16 @@
-package constraint
+package utils
 
 import (
 	"io"
 	"math/big"
 	"reflect"
+
+	"github.com/consensys/gnark-crypto/ecc"
 )
+
+func FieldToCurve(q *big.Int) ecc.ID {
+	return ecc.BN254
+}
 
 // FromInterface converts an interface to a big.Int element
 //

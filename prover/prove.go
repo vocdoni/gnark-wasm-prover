@@ -1,4 +1,4 @@
-package plonk
+package prover
 
 import (
 	"crypto/sha256"
@@ -14,7 +14,7 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr/iop"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr/kzg"
 	fiatshamir "github.com/consensys/gnark-crypto/fiat-shamir"
-	"github.com/vocdoni/gnark-wasm-prover/constraint"
+	constraint "github.com/vocdoni/gnark-wasm-prover/csbn254"
 	"github.com/vocdoni/gnark-wasm-prover/witness"
 )
 
