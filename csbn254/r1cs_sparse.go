@@ -478,7 +478,7 @@ func (cs *SparseR1CS) CurveID() ecc.ID {
 
 // WriteTo encodes SparseR1CS into provided io.Writer using cbor
 func (cs *SparseR1CS) WriteTo(w io.Writer) (int64, error) {
-	return encoder.EncodeToGob(w, cs)
+	return encoder.Encode(w, cs)
 }
 
 // ReadFrom attempts to decode SparseR1CS from io.Reader using cbor
@@ -487,7 +487,7 @@ func (cs *SparseR1CS) ReadFrom(r io.Reader) (int64, error) {
 	// initialize coeff table
 	cs.CoeffTable = newCoeffTable(0)
 	 
-	n, err := encoder.DecodeFromGob(r, cs)
+	n, err := encoder.Decode(r, cs)
 	if err != nil { 	
 		return n, err
 	}
