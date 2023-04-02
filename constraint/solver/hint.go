@@ -1,10 +1,12 @@
 package solver
 
 import (
+	"fmt"
 	"hash/fnv"
 	"math/big"
 	"reflect"
 	"runtime"
+	"strings"
 )
 
 // HintID is a unique identifier for a hint function used for lookup.
@@ -87,6 +89,17 @@ type Hint func(field *big.Int, inputs []*big.Int, outputs []*big.Int) error
 func GetHintID(fn Hint) HintID {
 	hf := fnv.New32a()
 	name := GetHintName(fn)
+
+	// Workaround for matching hint names between gnark and gnark-wasm-prover
+	fmt.Printf("register hint name is %s\n", name)
+
+	name = strings.ReplaceAll(name,
+		"github.com/vocdoni/gnark-wasm-prover/hints",
+		"github.com/consensys/gnark/std/math")
+
+	name = strings.ReplaceAll(name,
+		"github.com/vocdoni/gnark-wasm-prover/constraint",
+		"github.com/consensys/gnark/constraint")
 
 	// TODO relying on name to derive UUID is risky; if fn is an anonymous func, wil be package.glob..funcN
 	// and if new anonymous functions are added in the package, N may change, so will UUID.
