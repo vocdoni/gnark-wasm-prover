@@ -29,11 +29,11 @@ func (cr *ReaderCounter) Read(p []byte) (int, error) {
 }
 
 func Encode(w io.Writer, v interface{}) (int64, error) {
-	return encodeToGob(w, v)
+	return encodeToJSON(w, v)
 }
 
 func Decode(r io.Reader, v interface{}) (int64, error) {
-	return decodeFromGob(r, v)
+	return decodeFromJSON(r, v)
 }
 
 func encodeToJSON(w io.Writer, v interface{}) (int64, error) {
