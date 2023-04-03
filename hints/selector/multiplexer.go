@@ -13,6 +13,7 @@
 package selector
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/vocdoni/gnark-wasm-prover/constraint/solver"
@@ -21,8 +22,8 @@ import (
 
 func init() {
 	// register hints
-	solver.RegisterHint(MuxIndicators)
-	solver.RegisterHint(MapIndicators)
+	solver.RegisterHint(MuxIndicators, fmt.Sprintf("%s/selector.MuxIndicators", solver.MathHintPrefix))
+	solver.RegisterHint(MapIndicators, fmt.Sprintf("%s/selector.MapIndicators", solver.MathHintPrefix))
 }
 
 // Map is a key value associative array: the output will be values[i] such that keys[i] == queryKey. If keys does not

@@ -1,6 +1,7 @@
 package bits
 
 import (
+	"fmt"
 	"math"
 	"math/big"
 
@@ -13,7 +14,7 @@ import (
 var NTrits = nTrits
 
 func init() {
-	solver.RegisterHint(NTrits)
+	solver.RegisterHint(NTrits, fmt.Sprintf("%s/bits.NTrits", solver.MathHintPrefix))
 }
 
 // ToTernary is an alias of ToBase(api, Ternary, v, opts...)

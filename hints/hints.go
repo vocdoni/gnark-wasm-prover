@@ -1,6 +1,7 @@
 package hints
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/vocdoni/gnark-wasm-prover/constraint/solver"
@@ -20,10 +21,10 @@ func RegisterHints() {
 
 func registerHints() {
 	// note that importing these packages may already trigger a call to solver.RegisterHint(...)
-	solver.RegisterHint(bits.NTrits)
-	solver.RegisterHint(bits.NNAF)
-	solver.RegisterHint(bits.IthBit)
-	solver.RegisterHint(bits.NBits)
-	solver.RegisterHint(selector.MuxIndicators)
-	solver.RegisterHint(selector.MapIndicators)
+	solver.RegisterHint(bits.NTrits, fmt.Sprintf("%s/bits.NTrits", solver.MathHintPrefix))
+	solver.RegisterHint(bits.NNAF, fmt.Sprintf("%s/bits.NNAF", solver.MathHintPrefix))
+	solver.RegisterHint(bits.IthBit, fmt.Sprintf("%s/bits.IthBit", solver.MathHintPrefix))
+	solver.RegisterHint(bits.NBits, fmt.Sprintf("%s/bits.NBits", solver.MathHintPrefix))
+	solver.RegisterHint(selector.MuxIndicators, fmt.Sprintf("%s/selector.MuxIndicators", solver.MathHintPrefix))
+	solver.RegisterHint(selector.MapIndicators, fmt.Sprintf("%s/selector.MapIndicators", solver.MathHintPrefix))
 }

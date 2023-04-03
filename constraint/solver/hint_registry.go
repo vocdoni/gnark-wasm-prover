@@ -2,12 +2,21 @@ package solver
 
 import (
 	"fmt"
+	"hash/fnv"
 	"math/big"
 	"sync"
 )
 
+const (
+	MathHintPrefix       = "github.com/consensys/gnark/std/math"
+	ConstraintHintPrefix = "github.com/consensys/gnark/constraint"
+)
+
 func init() {
-	RegisterHint(InvZeroHint)
+	RegisterHint(
+		InvZeroHint,
+		fmt.Sprintf("%s/solver.InvZeroHint", ConstraintHintPrefix),
+	)
 }
 
 var (
@@ -16,17 +25,19 @@ var (
 )
 
 // RegisterHint registers a hint function in the global registry.
-func RegisterHint(hintFns ...Hint) {
+func RegisterHint(hintFn Hint, hintName string) {
 	registryM.Lock()
 	defer registryM.Unlock()
-	for _, hintFn := range hintFns {
-		key := GetHintID(hintFn)
-		if _, ok := registry[key]; ok {
-			fmt.Println("function registered multiple times")
-			return
-		}
-		registry[key] = hintFn
+	fmt.Printf("registering hint %s\n", hintName)
+	hf := fnv.New32a()
+	hf.Write([]byte(hintName)) // #nosec G104 -- does not err
+	key := HintID(hf.Sum32())
+
+	if _, ok := registry[key]; ok {
+		fmt.Printf("function %s registered multiple times\n", hintName)
+		return
 	}
+	registry[key] = hintFn
 }
 
 // GetRegisteredHints returns all registered hint functions.
