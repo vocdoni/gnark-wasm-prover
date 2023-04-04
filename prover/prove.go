@@ -36,7 +36,9 @@ type Proof struct {
 }
 
 func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witness) (*Proof, error) {
+	start0 := time.Now()
 	start := time.Now()
+
 	// pick a hash function that will be used to derive the challenges
 	hFunc := sha256.New()
 
@@ -47,6 +49,8 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 	proof := &Proof{}
 
 	// query l, r, o in Lagrange basis, not blinded
+	fmt.Println("starting lagrange")
+
 	_solution, err := spr.Solve(fullWitness)
 	if err != nil {
 		return nil, err
@@ -66,6 +70,10 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 	wliop.ToCanonical(&pk.Domain[0]).ToRegular()
 	wriop.ToCanonical(&pk.Domain[0]).ToRegular()
 	woiop.ToCanonical(&pk.Domain[0]).ToRegular()
+
+	fmt.Println("done lagrange, took", time.Since(start))
+	fmt.Println("starting blind")
+	start = time.Now()
 
 	// Blind l, r, o before committing
 	// we set the underlying slice capacity to domain[1].Cardinality to minimize mem moves.
@@ -92,6 +100,10 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 		return nil, err
 	}
 
+	fmt.Println("done blind, took", time.Since(start))
+	fmt.Println("starting shamir")
+	start = time.Now()
+
 	// Fiat Shamir this
 	bbeta, err := fs.ComputeChallenge("beta")
 	if err != nil {
@@ -99,6 +111,10 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 	}
 	var beta fr.Element
 	beta.SetBytes(bbeta)
+
+	fmt.Println("done shamir, took", time.Since(start))
+	fmt.Println("starting copy and commit")
+	start = time.Now()
 
 	// compute the copy constraint's ratio
 	// We copy liop, riop, oiop because they are fft'ed in the process.
@@ -134,6 +150,10 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 		return proof, err
 	}
 
+	fmt.Println("done copy and commit, took", time.Since(start))
+	fmt.Println("starting qk")
+	start = time.Now()
+
 	// compute qk in canonical basis, completed with the public inputs
 	qkCompletedCanonical := make([]fr.Element, pk.Domain[0].Cardinality)
 	copy(qkCompletedCanonical, fw[:len(spr.Public)])
@@ -164,6 +184,10 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 	widiop := iop.NewPolynomial(&id, canReg)
 	widiop.ToLagrangeCoset(&pk.Domain[1])
 
+	fmt.Println("done qk, took", time.Since(start))
+	fmt.Println("starting permutation")
+	start = time.Now()
+
 	// permutations in LagrangeCoset: we don't mutate so no need to clone the coefficients from the
 	// proving key.
 	ws1 := iop.NewPolynomial(&pk.lS1LagrangeCoset, lagrangeCosetBitReversed)
@@ -173,6 +197,10 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 	// Store z(g*x), without reallocating a slice
 	bwsziop := bwziop.ShallowClone().Shift(1)
 	bwsziop.ToLagrangeCoset(&pk.Domain[1])
+
+	fmt.Println("done permutation, took", time.Since(start))
+	fmt.Println("starting capture")
+	start = time.Now()
 
 	// L_{g^{0}}
 	cap := pk.Domain[1].Cardinality
@@ -201,6 +229,10 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 
 		return ic
 	}
+
+	fmt.Println("done capture, took", time.Since(start))
+	fmt.Println("starting compute")
+	start = time.Now()
 
 	fo := func(l, r, o, fid, fs1, fs2, fs3, fz, fzs fr.Element) fr.Element {
 		var uu fr.Element
@@ -268,6 +300,10 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 		return nil, err
 	}
 
+	fmt.Println("done compute, took", time.Since(start))
+	fmt.Println("starting commit kzg")
+	start = time.Now()
+
 	// compute kzg commitments of h1, h2 and h3
 	if err := commitToQuotient(
 		h.Coefficients()[:pk.Domain[0].Cardinality+2],
@@ -277,35 +313,32 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 		return nil, err
 	}
 
+	fmt.Println("done commit kzg, took", time.Since(start))
+	fmt.Println("starting derive randomness")
+	start = time.Now()
+
 	// derive zeta
 	zeta, err := deriveRandomness(&fs, "zeta", &proof.H[0], &proof.H[1], &proof.H[2])
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Println("done derive randomness, took", time.Since(start))
+	fmt.Println("starting evals")
+	start = time.Now()
+
 	// compute evaluations of (blinded version of) l, r, o, z at zeta
 	var blzeta, brzeta, bozeta fr.Element
 
-	var wgEvals sync.WaitGroup
-	wgEvals.Add(3)
+	// THIS WAS PARALELIZED
+	bwliop.ToCanonical(&pk.Domain[1]).ToRegular()
+	blzeta = bwliop.Evaluate(zeta)
 
-	go func() {
-		bwliop.ToCanonical(&pk.Domain[1]).ToRegular()
-		blzeta = bwliop.Evaluate(zeta)
-		wgEvals.Done()
-	}()
+	bwriop.ToCanonical(&pk.Domain[1]).ToRegular()
+	brzeta = bwriop.Evaluate(zeta)
 
-	go func() {
-		bwriop.ToCanonical(&pk.Domain[1]).ToRegular()
-		brzeta = bwriop.Evaluate(zeta)
-		wgEvals.Done()
-	}()
-
-	go func() {
-		bwoiop.ToCanonical(&pk.Domain[1]).ToRegular()
-		bozeta = bwoiop.Evaluate(zeta)
-		wgEvals.Done()
-	}()
+	bwoiop.ToCanonical(&pk.Domain[1]).ToRegular()
+	bozeta = bwoiop.Evaluate(zeta)
 
 	// open blinded Z at zeta*z
 	bwziop.ToCanonical(&pk.Domain[1]).ToRegular()
@@ -329,7 +362,9 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 		errLPoly                      error
 	)
 
-	wgEvals.Wait() // wait for the evaluations
+	fmt.Println("done evals, took", time.Since(start))
+	fmt.Println("starting linearization")
+	start = time.Now()
 
 	// compute the linearization polynomial r at zeta
 	// (goal: save committing separately to z, ql, qr, qm, qo, k
@@ -379,6 +414,10 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 		return nil, errLPoly
 	}
 
+	fmt.Println("done linearization, took", time.Since(start))
+	fmt.Println("starting batch open")
+	start = time.Now()
+
 	// Batch open the first list of polynomials
 	proof.BatchedProof, err = kzg.BatchOpenSinglePoint(
 		[][]fr.Element{
@@ -404,7 +443,11 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 		pk.Vk.KZGSRS,
 	)
 
-	fmt.Printf("took %s\n", time.Since(start))
+	fmt.Println("done batch open, took", time.Since(start))
+	fmt.Println("starting challenge")
+	start = time.Now()
+
+	fmt.Printf("took %s\n", time.Since(start0))
 
 	if err != nil {
 		return nil, err
@@ -414,24 +457,13 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 
 // fills proof.LRO with kzg commits of bcl, bcr and bco
 func commitToLRO(bcl, bcr, bco []fr.Element, proof *Proof, srs *kzg.SRS) error {
-	n := runtime.NumCPU() / 2
+	n := 1
 	var err0, err1, err2 error
-	chCommit0 := make(chan struct{}, 1)
-	chCommit1 := make(chan struct{}, 1)
-	go func() {
-		proof.LRO[0], err0 = kzg.Commit(bcl, srs, n)
-		close(chCommit0)
-	}()
-	go func() {
-		proof.LRO[1], err1 = kzg.Commit(bcr, srs, n)
-		close(chCommit1)
-	}()
+	proof.LRO[0], err0 = kzg.Commit(bcl, srs, n)
+	proof.LRO[1], err1 = kzg.Commit(bcr, srs, n)
 	if proof.LRO[2], err2 = kzg.Commit(bco, srs, n); err2 != nil {
 		return err2
 	}
-	<-chCommit0
-	<-chCommit1
-
 	if err0 != nil {
 		return err0
 	}
@@ -440,23 +472,13 @@ func commitToLRO(bcl, bcr, bco []fr.Element, proof *Proof, srs *kzg.SRS) error {
 }
 
 func commitToQuotient(h1, h2, h3 []fr.Element, proof *Proof, srs *kzg.SRS) error {
-	n := runtime.NumCPU() / 2
+	n := 1
 	var err0, err1, err2 error
-	chCommit0 := make(chan struct{}, 1)
-	chCommit1 := make(chan struct{}, 1)
-	go func() {
-		proof.H[0], err0 = kzg.Commit(h1, srs, n)
-		close(chCommit0)
-	}()
-	go func() {
-		proof.H[1], err1 = kzg.Commit(h2, srs, n)
-		close(chCommit1)
-	}()
+	proof.H[0], err0 = kzg.Commit(h1, srs, n)
+	proof.H[1], err1 = kzg.Commit(h2, srs, n)
 	if proof.H[2], err2 = kzg.Commit(h3, srs, n); err2 != nil {
 		return err2
 	}
-	<-chCommit0
-	<-chCommit1
 
 	if err0 != nil {
 		return err0
