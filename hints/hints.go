@@ -19,11 +19,32 @@ func RegisterHints() {
 }
 
 func registerHints() {
+	toRegister := map[solver.HintID]solver.Hint{
+		solver.GetHintID(bits.NTrits):            bits.NTrits,
+		solver.GetHintID(bits.NNAF):              bits.NNAF,
+		solver.GetHintID(bits.IthBit):            bits.IthBit,
+		solver.GetHintID(bits.NBits):             bits.NBits,
+		solver.GetHintID(selector.MuxIndicators): selector.MuxIndicators,
+		solver.GetHintID(selector.MapIndicators): selector.MapIndicators,
+		solver.GetHintID(solver.InvZeroHint):     solver.InvZeroHint,
+	}
+
 	// note that importing these packages may already trigger a call to solver.RegisterHint(...)
-	solver.RegisterHint(bits.NTrits)
-	solver.RegisterHint(bits.NNAF)
-	solver.RegisterHint(bits.IthBit)
-	solver.RegisterHint(bits.NBits)
-	solver.RegisterHint(selector.MuxIndicators)
-	solver.RegisterHint(selector.MapIndicators)
+	currentHintsIDS := []solver.HintID{}
+	for _, hint := range solver.GetRegisteredHints() {
+		currentHintsIDS = append(currentHintsIDS, solver.GetHintID(hint))
+	}
+
+	for newHintID, newHint := range toRegister {
+		alreadyRegistered := false
+		for _, hintID := range currentHintsIDS {
+			if hintID == newHintID {
+				alreadyRegistered = true
+			}
+		}
+
+		if !alreadyRegistered {
+			solver.RegisterHint(newHint)
+		}
+	}
 }
