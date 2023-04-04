@@ -499,28 +499,23 @@ func commitToQuotient(h1, h2, h3 []fr.Element, proof *Proof, srs *kzg.SRS) error
 // + α*( (l(ζ)+β*s1(ζ)+γ)*(r(ζ)+β*s2(ζ)+γ)*Z(μζ)*s3(X) - Z(X)*(l(ζ)+β*id1(ζ)+γ)*(r(ζ)+β*id2(ζ)+γ)*(o(ζ)+β*id3(ζ)+γ))
 // + l(ζ)*Ql(X) + l(ζ)r(ζ)*Qm(X) + r(ζ)*Qr(X) + o(ζ)*Qo(X) + Qk(X)
 func computeLinearizedPolynomial(lZeta, rZeta, oZeta, alpha, beta, gamma, zeta, zu fr.Element, blindedZCanonical []fr.Element, pk *ProvingKey) []fr.Element {
+	// Reuse memory allocations
+	var rl, s1, s2, tmp, uzeta, uuzeta, lagrangeZeta, one, den, frNbElmt fr.Element
 
 	// first part: individual constraints
-	var rl fr.Element
 	rl.Mul(&rZeta, &lZeta)
 
-	// second part:
-	// Z(μζ)(l(ζ)+β*s1(ζ)+γ)*(r(ζ)+β*s2(ζ)+γ)*β*s3(X)-Z(X)(l(ζ)+β*id1(ζ)+γ)*(r(ζ)+β*id2(ζ)+γ)*(o(ζ)+β*id3(ζ)+γ)
-	var s1, s2 fr.Element
-	chS1 := make(chan struct{}, 1)
-	go func() {
-		ps1 := iop.NewPolynomial(&pk.S1Canonical, iop.Form{Basis: iop.Canonical, Layout: iop.Regular})
-		s1 = ps1.Evaluate(zeta)                              // s1(ζ)
-		s1.Mul(&s1, &beta).Add(&s1, &lZeta).Add(&s1, &gamma) // (l(ζ)+β*s1(ζ)+γ)
-		close(chS1)
-	}()
+	// second part (modification: removed channel and goroutine):
+	ps1 := iop.NewPolynomial(&pk.S1Canonical, iop.Form{Basis: iop.Canonical, Layout: iop.Regular})
+	s1 = ps1.Evaluate(zeta)                              // s1(ζ)
+	s1.Mul(&s1, &beta).Add(&s1, &lZeta).Add(&s1, &gamma) // (l(ζ)+β*s1(ζ)+γ)
+
 	ps2 := iop.NewPolynomial(&pk.S2Canonical, iop.Form{Basis: iop.Canonical, Layout: iop.Regular})
-	tmp := ps2.Evaluate(zeta)                                // s2(ζ)
+	tmp = ps2.Evaluate(zeta)                                 // s2(ζ)
 	tmp.Mul(&tmp, &beta).Add(&tmp, &rZeta).Add(&tmp, &gamma) // (r(ζ)+β*s2(ζ)+γ)
-	<-chS1
+
 	s1.Mul(&s1, &tmp).Mul(&s1, &zu).Mul(&s1, &beta) // (l(ζ)+β*s1(β)+γ)*(r(ζ)+β*s2(β)+γ)*β*Z(μζ)
 
-	var uzeta, uuzeta fr.Element
 	uzeta.Mul(&zeta, &pk.Vk.CosetShift)
 	uuzeta.Mul(&uzeta, &pk.Vk.CosetShift)
 
@@ -532,11 +527,9 @@ func computeLinearizedPolynomial(lZeta, rZeta, oZeta, alpha, beta, gamma, zeta, 
 	s2.Neg(&s2)                                                 // -(l(ζ)+β*ζ+γ)*(r(ζ)+β*u*ζ+γ)*(o(ζ)+β*u²*ζ+γ)
 
 	// third part L₁(ζ)*α²*Z
-	var lagrangeZeta, one, den, frNbElmt fr.Element
 	one.SetOne()
 	nbElmt := int64(pk.Domain[0].Cardinality)
-	lagrangeZeta.Set(&zeta).
-		Exp(lagrangeZeta, big.NewInt(nbElmt)).
+	lagrangeZeta.Set(&zeta).Exp(lagrangeZeta, big.NewInt(nbElmt)).
 		Sub(&lagrangeZeta, &one)
 	frNbElmt.SetUint64(uint64(nbElmt))
 	den.Sub(&zeta, &one).
@@ -544,13 +537,13 @@ func computeLinearizedPolynomial(lZeta, rZeta, oZeta, alpha, beta, gamma, zeta, 
 	lagrangeZeta.Mul(&lagrangeZeta, &den). // L₁ = (ζⁿ⁻¹)/(ζ-1)
 						Mul(&lagrangeZeta, &alpha).
 						Mul(&lagrangeZeta, &alpha).
-						Mul(&lagrangeZeta, &pk.Domain[0].CardinalityInv) // (1/n)*α²*L₁(ζ)
-
+						Mul(&lagrangeZeta, &pk.Domain[0].CardinalityInv) // (1/n)α²L₁(ζ)
 	linPol := make([]fr.Element, len(blindedZCanonical))
 	copy(linPol, blindedZCanonical)
 
 	Parallelize(len(linPol), func(start, end int) {
 
+		// Reuse memory allocations
 		var t0, t1 fr.Element
 
 		for i := start; i < end; i++ {
@@ -589,13 +582,11 @@ func computeLinearizedPolynomial(lZeta, rZeta, oZeta, alpha, beta, gamma, zeta, 
 
 // Parallelize process in parallel the work function
 func Parallelize(nbIterations int, work func(int, int), maxCpus ...int) {
-
 	nbTasks := runtime.NumCPU()
 	if len(maxCpus) == 1 {
 		nbTasks = maxCpus[0]
 	}
 	nbIterationsPerCpus := nbIterations / nbTasks
-
 	// more CPUs than tasks: a CPU will work on exactly one iteration
 	if nbIterationsPerCpus < 1 {
 		nbIterationsPerCpus = 1
