@@ -15,6 +15,7 @@ import (
 	"github.com/vocdoni/gnark-crypto-bn254/ecc/bn254/fr/kzg"
 	fiatshamir "github.com/vocdoni/gnark-crypto-bn254/fiat-shamir"
 	constraint "github.com/vocdoni/gnark-wasm-prover/csbn254"
+	"github.com/vocdoni/gnark-wasm-prover/hints"
 	"github.com/vocdoni/gnark-wasm-prover/witness"
 )
 
@@ -37,6 +38,10 @@ type Proof struct {
 
 func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witness) (*Proof, error) {
 	start := time.Now()
+
+	// Register hints for the circuit
+	hints.RegisterHints()
+
 	// pick a hash function that will be used to derive the challenges
 	hFunc := sha256.New()
 
