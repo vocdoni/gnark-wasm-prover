@@ -40,17 +40,19 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 	start := time.Now()
 
 	// Register hints for the circuit
+	fmt.Println("Registering hints...")
 	hints.RegisterHints()
 
 	// pick a hash function that will be used to derive the challenges
 	hFunc := sha256.New()
-
+	fmt.Println("fiat shamir")
 	// create a transcript manager to apply Fiat Shamir
 	fs := fiatshamir.NewTranscript(hFunc, "gamma", "beta", "alpha", "zeta")
 
 	// result
 	proof := &Proof{}
 
+	fmt.Println("Lagrange basis...")
 	// query l, r, o in Lagrange basis, not blinded
 	_solution, err := spr.Solve(fullWitness)
 	if err != nil {
@@ -72,6 +74,7 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 	wriop.ToCanonical(&pk.Domain[0]).ToRegular()
 	woiop.ToCanonical(&pk.Domain[0]).ToRegular()
 
+	fmt.Println("blinding...")
 	// Blind l, r, o before committing
 	// we set the underlying slice capacity to domain[1].Cardinality to minimize mem moves.
 	bwliop := wliop.Clone(int(pk.Domain[1].Cardinality)).Blind(1)
@@ -98,6 +101,7 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 	}
 
 	// Fiat Shamir this
+	fmt.Println("Fiat Shamir...")
 	bbeta, err := fs.ComputeChallenge("beta")
 	if err != nil {
 		return nil, err
@@ -273,6 +277,7 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 		return nil, err
 	}
 
+	fmt.Println("compute kzg commitments of h1, h2 and h3")
 	// compute kzg commitments of h1, h2 and h3
 	if err := commitToQuotient(
 		h.Coefficients()[:pk.Domain[0].Cardinality+2],
@@ -288,6 +293,7 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 		return nil, err
 	}
 
+	fmt.Println("compute evaluations of (blinded version of) l, r, o, z at zeta")
 	// compute evaluations of (blinded version of) l, r, o, z at zeta
 	var blzeta, brzeta, bozeta fr.Element
 
@@ -384,6 +390,7 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 		return nil, errLPoly
 	}
 
+	fmt.Println("batch opening")
 	// Batch open the first list of polynomials
 	proof.BatchedProof, err = kzg.BatchOpenSinglePoint(
 		[][]fr.Element{
@@ -409,7 +416,7 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 		pk.Vk.KZGSRS,
 	)
 
-	fmt.Printf("took %s\n", time.Since(start))
+	fmt.Printf("proof took %s\n", time.Since(start))
 
 	if err != nil {
 		return nil, err

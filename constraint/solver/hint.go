@@ -91,7 +91,6 @@ func GetHintID(fn Hint) HintID {
 	name := GetHintName(fn)
 
 	// Workaround for matching hint names between gnark and gnark-wasm-prover
-	fmt.Printf("register hint name is %s\n", name)
 
 	name = strings.ReplaceAll(name,
 		"github.com/vocdoni/gnark-wasm-prover/hints",
@@ -100,6 +99,8 @@ func GetHintID(fn Hint) HintID {
 	name = strings.ReplaceAll(name,
 		"github.com/vocdoni/gnark-wasm-prover/constraint",
 		"github.com/consensys/gnark/constraint")
+
+	fmt.Printf("register hint name: %s\n", name)
 
 	// TODO relying on name to derive UUID is risky; if fn is an anonymous func, wil be package.glob..funcN
 	// and if new anonymous functions are added in the package, N may change, so will UUID.
