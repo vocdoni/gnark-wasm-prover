@@ -43,8 +43,9 @@ func OverrideHint(id HintID, f Hint) Option {
 // NewConfig returns a default SolverConfig with given prover options opts applied.
 func NewConfig(opts ...Option) (Config, error) {
 	opt := Config{HintFunctions: make(map[HintID]Hint)}
-	for _, v := range GetRegisteredHints() {
-		opt.HintFunctions[GetHintID(v)] = v
+
+	for id, v := range GetRegisteredHints() {
+		opt.HintFunctions[id] = v
 	}
 	for _, option := range opts {
 		if err := option(&opt); err != nil {
