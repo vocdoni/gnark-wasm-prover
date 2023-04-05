@@ -92,6 +92,117 @@ type VerifyingKey struct {
 	Ql, Qr, Qm, Qo, Qk kzg.Digest
 }
 
+// Setup sets proving and verifying keys
+func Setup(spr *cs.SparseR1CS, srs kzgg.SRS) (*ProvingKey, *VerifyingKey, error) {
+	var pk ProvingKey
+	var vk VerifyingKey
+
+	// The verifying key shares data with the proving key
+	pk.Vk = &vk
+
+	nbConstraints := len(spr.Constraints)
+
+	// fft domains
+	sizeSystem := uint64(nbConstraints + len(spr.Public)) // len(spr.Public) is for the placeholder constraints
+	pk.Domain[0] = *fft.NewDomain(sizeSystem)
+	pk.Vk.CosetShift.Set(&pk.Domain[0].FrMultiplicativeGen)
+
+	// h, the quotient polynomial is of degree 3(n+1)+2, so it's in a 3(n+2) dim vector space,
+	// the domain is the next power of 2 superior to 3(n+2). 4*domainNum is enough in all cases
+	// except when n<6.
+	if sizeSystem < 6 {
+		pk.Domain[1] = *fft.NewDomain(8 * sizeSystem)
+	} else {
+		pk.Domain[1] = *fft.NewDomain(4 * sizeSystem)
+	}
+
+	vk.Size = pk.Domain[0].Cardinality
+	vk.SizeInv.SetUint64(vk.Size).Inverse(&vk.SizeInv)
+	vk.Generator.Set(&pk.Domain[0].Generator)
+	vk.NbPublicVariables = uint64(len(spr.Public))
+
+	if err := pk.InitKZG(srs); err != nil {
+		return nil, nil, err
+	}
+
+	// public polynomials corresponding to constraints: [ placholders | constraints | assertions ]
+	pk.Ql = make([]fr.Element, pk.Domain[0].Cardinality)
+	pk.Qr = make([]fr.Element, pk.Domain[0].Cardinality)
+	pk.Qm = make([]fr.Element, pk.Domain[0].Cardinality)
+	pk.Qo = make([]fr.Element, pk.Domain[0].Cardinality)
+	pk.CQk = make([]fr.Element, pk.Domain[0].Cardinality)
+	pk.LQk = make([]fr.Element, pk.Domain[0].Cardinality)
+
+	for i := 0; i < len(spr.Public); i++ { // placeholders (-PUB_INPUT_i + qk_i = 0) TODO should return error is size is inconsistant
+		pk.Ql[i].SetOne().Neg(&pk.Ql[i])
+		pk.Qr[i].SetZero()
+		pk.Qm[i].SetZero()
+		pk.Qo[i].SetZero()
+		pk.CQk[i].SetZero()
+		pk.LQk[i].SetZero() // → to be completed by the prover
+	}
+	offset := len(spr.Public)
+	for i := 0; i < nbConstraints; i++ { // constraints
+
+		pk.Ql[offset+i].Set(&spr.Coefficients[spr.Constraints[i].L.CoeffID()])
+		pk.Qr[offset+i].Set(&spr.Coefficients[spr.Constraints[i].R.CoeffID()])
+		pk.Qm[offset+i].Set(&spr.Coefficients[spr.Constraints[i].M[0].CoeffID()]).
+			Mul(&pk.Qm[offset+i], &spr.Coefficients[spr.Constraints[i].M[1].CoeffID()])
+		pk.Qo[offset+i].Set(&spr.Coefficients[spr.Constraints[i].O.CoeffID()])
+		pk.CQk[offset+i].Set(&spr.Coefficients[spr.Constraints[i].K])
+		pk.LQk[offset+i].Set(&spr.Coefficients[spr.Constraints[i].K])
+	}
+
+	pk.Domain[0].FFTInverse(pk.Ql, fft.DIF)
+	pk.Domain[0].FFTInverse(pk.Qr, fft.DIF)
+	pk.Domain[0].FFTInverse(pk.Qm, fft.DIF)
+	pk.Domain[0].FFTInverse(pk.Qo, fft.DIF)
+	pk.Domain[0].FFTInverse(pk.CQk, fft.DIF)
+	fft.BitReverse(pk.Ql)
+	fft.BitReverse(pk.Qr)
+	fft.BitReverse(pk.Qm)
+	fft.BitReverse(pk.Qo)
+	fft.BitReverse(pk.CQk)
+
+	// build permutation. Note: at this stage, the permutation takes in account the placeholders
+	buildPermutation(spr, &pk)
+
+	// set s1, s2, s3
+	ccomputePermutationPolynomials(&pk)
+
+	// compute the lagrange coset basis versions (not serialized)
+	pk.computeLagrangeCosetPolys()
+
+	// Commit to the polynomials to set up the verifying key
+	var err error
+	if vk.Ql, err = kzg.Commit(pk.Ql, vk.KZGSRS); err != nil {
+		return nil, nil, err
+	}
+	if vk.Qr, err = kzg.Commit(pk.Qr, vk.KZGSRS); err != nil {
+		return nil, nil, err
+	}
+	if vk.Qm, err = kzg.Commit(pk.Qm, vk.KZGSRS); err != nil {
+		return nil, nil, err
+	}
+	if vk.Qo, err = kzg.Commit(pk.Qo, vk.KZGSRS); err != nil {
+		return nil, nil, err
+	}
+	if vk.Qk, err = kzg.Commit(pk.CQk, vk.KZGSRS); err != nil {
+		return nil, nil, err
+	}
+	if vk.S[0], err = kzg.Commit(pk.S1Canonical, vk.KZGSRS); err != nil {
+		return nil, nil, err
+	}
+	if vk.S[1], err = kzg.Commit(pk.S2Canonical, vk.KZGSRS); err != nil {
+		return nil, nil, err
+	}
+	if vk.S[2], err = kzg.Commit(pk.S3Canonical, vk.KZGSRS); err != nil {
+		return nil, nil, err
+	}
+
+	return &pk, &vk, nil
+}
+
 // buildPermutation builds the Permutation associated with a circuit.
 //
 // The permutation s is composed of cycles of maximum length such that
@@ -104,7 +215,7 @@ type VerifyingKey struct {
 // The permutation is encoded as a slice s of size 3*size(l), where the
 // i-th entry of l∥r∥o is sent to the s[i]-th entry, so it acts on a tab
 // like this: for i in tab: tab[i] = tab[permutation[i]]
-func buaildPermutation(spr *cs.SparseR1CS, pk *ProvingKey) {
+func buildPermutation(spr *cs.SparseR1CS, pk *ProvingKey) {
 
 	nbVariables := spr.NbInternalVariables + len(spr.Public) + len(spr.Secret)
 	sizeSolution := int(pk.Domain[0].Cardinality)

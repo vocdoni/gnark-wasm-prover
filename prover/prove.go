@@ -37,6 +37,7 @@ type Proof struct {
 }
 
 func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witness) (*Proof, error) {
+	start0 := time.Now()
 	start := time.Now()
 	fmt.Println("registering hints")
 	hints.RegisterHints()
@@ -50,14 +51,26 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 	proof := &Proof{}
 
 	// query l, r, o in Lagrange basis, not blinded
+	fmt.Println("starting lagrange")
+
 	_solution, err := spr.Solve(fullWitness)
 	if err != nil {
 		return nil, err
 	}
 	solution := _solution.(*constraint.SparseR1CSSolution)
-	evaluationLDomainSmall := []fr.Element(solution.L)
-	evaluationRDomainSmall := []fr.Element(solution.R)
-	evaluationODomainSmall := []fr.Element(solution.O)
+
+	//evaluationLDomainSmall := []fr.Element(solution.L)
+	//evaluationRDomainSmall := []fr.Element(solution.R)
+	//evaluationODomainSmall := []fr.Element(solution.O)
+	// Changed to preallocate memory for evaluationLDomainSmall, evaluationRDomainSmall, and evaluationODomainSmall
+	evaluationLDomainSmall := make([]fr.Element, len(solution.L), len(solution.L))
+	evaluationRDomainSmall := make([]fr.Element, len(solution.R), len(solution.R))
+	evaluationODomainSmall := make([]fr.Element, len(solution.O), len(solution.O))
+
+	// Use copy function to avoid using append
+	copy(evaluationLDomainSmall, solution.L)
+	copy(evaluationRDomainSmall, solution.R)
+	copy(evaluationODomainSmall, solution.O)
 
 	lagReg := iop.Form{Basis: iop.Lagrange, Layout: iop.Regular}
 	liop := iop.NewPolynomial(&evaluationLDomainSmall, lagReg)
@@ -69,6 +82,10 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 	wliop.ToCanonical(&pk.Domain[0]).ToRegular()
 	wriop.ToCanonical(&pk.Domain[0]).ToRegular()
 	woiop.ToCanonical(&pk.Domain[0]).ToRegular()
+
+	fmt.Println("done lagrange, took", time.Since(start))
+	fmt.Println("starting blind")
+	start = time.Now()
 
 	// Blind l, r, o before committing
 	// we set the underlying slice capacity to domain[1].Cardinality to minimize mem moves.
@@ -95,6 +112,10 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 		return nil, err
 	}
 
+	fmt.Println("done blind, took", time.Since(start))
+	fmt.Println("starting shamir")
+	start = time.Now()
+
 	// Fiat Shamir this
 	bbeta, err := fs.ComputeChallenge("beta")
 	if err != nil {
@@ -102,6 +123,10 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 	}
 	var beta fr.Element
 	beta.SetBytes(bbeta)
+
+	fmt.Println("done shamir, took", time.Since(start))
+	fmt.Println("starting copy and commit")
+	start = time.Now()
 
 	// compute the copy constraint's ratio
 	// We copy liop, riop, oiop because they are fft'ed in the process.
@@ -137,6 +162,10 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 		return proof, err
 	}
 
+	fmt.Println("done copy and commit, took", time.Since(start))
+	fmt.Println("starting qk")
+	start = time.Now()
+
 	// compute qk in canonical basis, completed with the public inputs
 	qkCompletedCanonical := make([]fr.Element, pk.Domain[0].Cardinality)
 	copy(qkCompletedCanonical, fw[:len(spr.Public)])
@@ -167,6 +196,10 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 	widiop := iop.NewPolynomial(&id, canReg)
 	widiop.ToLagrangeCoset(&pk.Domain[1])
 
+	fmt.Println("done qk, took", time.Since(start))
+	fmt.Println("starting permutation")
+	start = time.Now()
+
 	// permutations in LagrangeCoset: we don't mutate so no need to clone the coefficients from the
 	// proving key.
 	ws1 := iop.NewPolynomial(&pk.lS1LagrangeCoset, lagrangeCosetBitReversed)
@@ -176,6 +209,10 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 	// Store z(g*x), without reallocating a slice
 	bwsziop := bwziop.ShallowClone().Shift(1)
 	bwsziop.ToLagrangeCoset(&pk.Domain[1])
+
+	fmt.Println("done permutation, took", time.Since(start))
+	fmt.Println("starting capture")
+	start = time.Now()
 
 	// L_{g^{0}}
 	cap := pk.Domain[1].Cardinality
@@ -204,6 +241,10 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 
 		return ic
 	}
+
+	fmt.Println("done capture, took", time.Since(start))
+	fmt.Println("starting compute")
+	start = time.Now()
 
 	fo := func(l, r, o, fid, fs1, fs2, fs3, fz, fzs fr.Element) fr.Element {
 		var uu fr.Element
@@ -271,6 +312,10 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 		return nil, err
 	}
 
+	fmt.Println("done compute, took", time.Since(start))
+	fmt.Println("starting commit kzg")
+	start = time.Now()
+
 	// compute kzg commitments of h1, h2 and h3
 	if err := commitToQuotient(
 		h.Coefficients()[:pk.Domain[0].Cardinality+2],
@@ -280,35 +325,32 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 		return nil, err
 	}
 
+	fmt.Println("done commit kzg, took", time.Since(start))
+	fmt.Println("starting derive randomness")
+	start = time.Now()
+
 	// derive zeta
 	zeta, err := deriveRandomness(&fs, "zeta", &proof.H[0], &proof.H[1], &proof.H[2])
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Println("done derive randomness, took", time.Since(start))
+	fmt.Println("starting evals")
+	start = time.Now()
+
 	// compute evaluations of (blinded version of) l, r, o, z at zeta
 	var blzeta, brzeta, bozeta fr.Element
 
-	var wgEvals sync.WaitGroup
-	wgEvals.Add(3)
+	// THIS WAS PARALELIZED
+	bwliop.ToCanonical(&pk.Domain[1]).ToRegular()
+	blzeta = bwliop.Evaluate(zeta)
 
-	go func() {
-		bwliop.ToCanonical(&pk.Domain[1]).ToRegular()
-		blzeta = bwliop.Evaluate(zeta)
-		wgEvals.Done()
-	}()
+	bwriop.ToCanonical(&pk.Domain[1]).ToRegular()
+	brzeta = bwriop.Evaluate(zeta)
 
-	go func() {
-		bwriop.ToCanonical(&pk.Domain[1]).ToRegular()
-		brzeta = bwriop.Evaluate(zeta)
-		wgEvals.Done()
-	}()
-
-	go func() {
-		bwoiop.ToCanonical(&pk.Domain[1]).ToRegular()
-		bozeta = bwoiop.Evaluate(zeta)
-		wgEvals.Done()
-	}()
+	bwoiop.ToCanonical(&pk.Domain[1]).ToRegular()
+	bozeta = bwoiop.Evaluate(zeta)
 
 	// open blinded Z at zeta*z
 	bwziop.ToCanonical(&pk.Domain[1]).ToRegular()
@@ -332,7 +374,9 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 		errLPoly                      error
 	)
 
-	wgEvals.Wait() // wait for the evaluations
+	fmt.Println("done evals, took", time.Since(start))
+	fmt.Println("starting linearization")
+	start = time.Now()
 
 	// compute the linearization polynomial r at zeta
 	// (goal: save committing separately to z, ql, qr, qm, qo, k
@@ -382,6 +426,10 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 		return nil, errLPoly
 	}
 
+	fmt.Println("done linearization, took", time.Since(start))
+	fmt.Println("starting batch open")
+	start = time.Now()
+
 	// Batch open the first list of polynomials
 	proof.BatchedProof, err = kzg.BatchOpenSinglePoint(
 		[][]fr.Element{
@@ -407,7 +455,11 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 		pk.Vk.KZGSRS,
 	)
 
-	fmt.Printf("took %s\n", time.Since(start))
+	fmt.Println("done batch open, took", time.Since(start))
+	fmt.Println("starting challenge")
+	start = time.Now()
+
+	fmt.Printf("took %s\n", time.Since(start0))
 
 	if err != nil {
 		return nil, err
@@ -417,24 +469,13 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 
 // fills proof.LRO with kzg commits of bcl, bcr and bco
 func commitToLRO(bcl, bcr, bco []fr.Element, proof *Proof, srs *kzg.SRS) error {
-	n := runtime.NumCPU() / 2
+	n := 1
 	var err0, err1, err2 error
-	chCommit0 := make(chan struct{}, 1)
-	chCommit1 := make(chan struct{}, 1)
-	go func() {
-		proof.LRO[0], err0 = kzg.Commit(bcl, srs, n)
-		close(chCommit0)
-	}()
-	go func() {
-		proof.LRO[1], err1 = kzg.Commit(bcr, srs, n)
-		close(chCommit1)
-	}()
+	proof.LRO[0], err0 = kzg.Commit(bcl, srs, n)
+	proof.LRO[1], err1 = kzg.Commit(bcr, srs, n)
 	if proof.LRO[2], err2 = kzg.Commit(bco, srs, n); err2 != nil {
 		return err2
 	}
-	<-chCommit0
-	<-chCommit1
-
 	if err0 != nil {
 		return err0
 	}
@@ -443,23 +484,13 @@ func commitToLRO(bcl, bcr, bco []fr.Element, proof *Proof, srs *kzg.SRS) error {
 }
 
 func commitToQuotient(h1, h2, h3 []fr.Element, proof *Proof, srs *kzg.SRS) error {
-	n := runtime.NumCPU() / 2
+	n := 1
 	var err0, err1, err2 error
-	chCommit0 := make(chan struct{}, 1)
-	chCommit1 := make(chan struct{}, 1)
-	go func() {
-		proof.H[0], err0 = kzg.Commit(h1, srs, n)
-		close(chCommit0)
-	}()
-	go func() {
-		proof.H[1], err1 = kzg.Commit(h2, srs, n)
-		close(chCommit1)
-	}()
+	proof.H[0], err0 = kzg.Commit(h1, srs, n)
+	proof.H[1], err1 = kzg.Commit(h2, srs, n)
 	if proof.H[2], err2 = kzg.Commit(h3, srs, n); err2 != nil {
 		return err2
 	}
-	<-chCommit0
-	<-chCommit1
 
 	if err0 != nil {
 		return err0
@@ -480,28 +511,23 @@ func commitToQuotient(h1, h2, h3 []fr.Element, proof *Proof, srs *kzg.SRS) error
 // + α*( (l(ζ)+β*s1(ζ)+γ)*(r(ζ)+β*s2(ζ)+γ)*Z(μζ)*s3(X) - Z(X)*(l(ζ)+β*id1(ζ)+γ)*(r(ζ)+β*id2(ζ)+γ)*(o(ζ)+β*id3(ζ)+γ))
 // + l(ζ)*Ql(X) + l(ζ)r(ζ)*Qm(X) + r(ζ)*Qr(X) + o(ζ)*Qo(X) + Qk(X)
 func computeLinearizedPolynomial(lZeta, rZeta, oZeta, alpha, beta, gamma, zeta, zu fr.Element, blindedZCanonical []fr.Element, pk *ProvingKey) []fr.Element {
+	// Reuse memory allocations
+	var rl, s1, s2, tmp, uzeta, uuzeta, lagrangeZeta, one, den, frNbElmt fr.Element
 
 	// first part: individual constraints
-	var rl fr.Element
 	rl.Mul(&rZeta, &lZeta)
 
-	// second part:
-	// Z(μζ)(l(ζ)+β*s1(ζ)+γ)*(r(ζ)+β*s2(ζ)+γ)*β*s3(X)-Z(X)(l(ζ)+β*id1(ζ)+γ)*(r(ζ)+β*id2(ζ)+γ)*(o(ζ)+β*id3(ζ)+γ)
-	var s1, s2 fr.Element
-	chS1 := make(chan struct{}, 1)
-	go func() {
-		ps1 := iop.NewPolynomial(&pk.S1Canonical, iop.Form{Basis: iop.Canonical, Layout: iop.Regular})
-		s1 = ps1.Evaluate(zeta)                              // s1(ζ)
-		s1.Mul(&s1, &beta).Add(&s1, &lZeta).Add(&s1, &gamma) // (l(ζ)+β*s1(ζ)+γ)
-		close(chS1)
-	}()
+	// second part (modification: removed channel and goroutine):
+	ps1 := iop.NewPolynomial(&pk.S1Canonical, iop.Form{Basis: iop.Canonical, Layout: iop.Regular})
+	s1 = ps1.Evaluate(zeta)                              // s1(ζ)
+	s1.Mul(&s1, &beta).Add(&s1, &lZeta).Add(&s1, &gamma) // (l(ζ)+β*s1(ζ)+γ)
+
 	ps2 := iop.NewPolynomial(&pk.S2Canonical, iop.Form{Basis: iop.Canonical, Layout: iop.Regular})
-	tmp := ps2.Evaluate(zeta)                                // s2(ζ)
+	tmp = ps2.Evaluate(zeta)                                 // s2(ζ)
 	tmp.Mul(&tmp, &beta).Add(&tmp, &rZeta).Add(&tmp, &gamma) // (r(ζ)+β*s2(ζ)+γ)
-	<-chS1
+
 	s1.Mul(&s1, &tmp).Mul(&s1, &zu).Mul(&s1, &beta) // (l(ζ)+β*s1(β)+γ)*(r(ζ)+β*s2(β)+γ)*β*Z(μζ)
 
-	var uzeta, uuzeta fr.Element
 	uzeta.Mul(&zeta, &pk.Vk.CosetShift)
 	uuzeta.Mul(&uzeta, &pk.Vk.CosetShift)
 
@@ -513,11 +539,9 @@ func computeLinearizedPolynomial(lZeta, rZeta, oZeta, alpha, beta, gamma, zeta, 
 	s2.Neg(&s2)                                                 // -(l(ζ)+β*ζ+γ)*(r(ζ)+β*u*ζ+γ)*(o(ζ)+β*u²*ζ+γ)
 
 	// third part L₁(ζ)*α²*Z
-	var lagrangeZeta, one, den, frNbElmt fr.Element
 	one.SetOne()
 	nbElmt := int64(pk.Domain[0].Cardinality)
-	lagrangeZeta.Set(&zeta).
-		Exp(lagrangeZeta, big.NewInt(nbElmt)).
+	lagrangeZeta.Set(&zeta).Exp(lagrangeZeta, big.NewInt(nbElmt)).
 		Sub(&lagrangeZeta, &one)
 	frNbElmt.SetUint64(uint64(nbElmt))
 	den.Sub(&zeta, &one).
@@ -525,13 +549,13 @@ func computeLinearizedPolynomial(lZeta, rZeta, oZeta, alpha, beta, gamma, zeta, 
 	lagrangeZeta.Mul(&lagrangeZeta, &den). // L₁ = (ζⁿ⁻¹)/(ζ-1)
 						Mul(&lagrangeZeta, &alpha).
 						Mul(&lagrangeZeta, &alpha).
-						Mul(&lagrangeZeta, &pk.Domain[0].CardinalityInv) // (1/n)*α²*L₁(ζ)
-
+						Mul(&lagrangeZeta, &pk.Domain[0].CardinalityInv) // (1/n)α²L₁(ζ)
 	linPol := make([]fr.Element, len(blindedZCanonical))
 	copy(linPol, blindedZCanonical)
 
 	Parallelize(len(linPol), func(start, end int) {
 
+		// Reuse memory allocations
 		var t0, t1 fr.Element
 
 		for i := start; i < end; i++ {
@@ -570,13 +594,11 @@ func computeLinearizedPolynomial(lZeta, rZeta, oZeta, alpha, beta, gamma, zeta, 
 
 // Parallelize process in parallel the work function
 func Parallelize(nbIterations int, work func(int, int), maxCpus ...int) {
-
 	nbTasks := runtime.NumCPU()
 	if len(maxCpus) == 1 {
 		nbTasks = maxCpus[0]
 	}
 	nbIterationsPerCpus := nbIterations / nbTasks
-
 	// more CPUs than tasks: a CPU will work on exactly one iteration
 	if nbIterationsPerCpus < 1 {
 		nbIterationsPerCpus = 1

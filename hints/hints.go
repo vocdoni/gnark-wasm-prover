@@ -27,4 +27,5 @@ func registerHints() {
 	solver.RegisterHint(bits.NBits, fmt.Sprintf("%s/bits.NBits", solver.MathHintPrefix))
 	solver.RegisterHint(selector.MuxIndicators, fmt.Sprintf("%s/selector.MuxIndicators", solver.MathHintPrefix))
 	solver.RegisterHint(selector.MapIndicators, fmt.Sprintf("%s/selector.MapIndicators", solver.MathHintPrefix))
+
 }
