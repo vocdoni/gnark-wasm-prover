@@ -92,10 +92,11 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 	bwliop := wliop.Clone(int(pk.Domain[1].Cardinality)).Blind(1)
 	bwriop := wriop.Clone(int(pk.Domain[1].Cardinality)).Blind(1)
 	bwoiop := woiop.Clone(int(pk.Domain[1].Cardinality)).Blind(1)
+	fmt.Println("commit to LR0")
 	if err := commitToLRO(bwliop.Coefficients(), bwriop.Coefficients(), bwoiop.Coefficients(), proof, pk.Vk.KZGSRS); err != nil {
 		return nil, err
 	}
-
+	fmt.Println("full witness vector")
 	fw, ok := fullWitness.Vector().(fr.Vector)
 	if !ok {
 		return nil, witness.ErrInvalidWitness
@@ -104,9 +105,11 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 	// The first challenge is derived using the public data: the commitments to the permutation,
 	// the coefficients of the circuit, and the public inputs.
 	// derive gamma from the Comm(blinded cl), Comm(blinded cr), Comm(blinded co)
+	fmt.Println("bindPublicData")
 	if err := bindPublicData(&fs, "gamma", *pk.Vk, fw[:len(spr.Public)]); err != nil {
 		return nil, err
 	}
+	fmt.Println("deriveRandomness")
 	gamma, err := deriveRandomness(&fs, "gamma", &proof.LRO[0], &proof.LRO[1], &proof.LRO[2])
 	if err != nil {
 		return nil, err
@@ -468,7 +471,34 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 }
 
 // fills proof.LRO with kzg commits of bcl, bcr and bco
+// fills proof.LRO with kzg commits of bcl, bcr and bco
 func commitToLRO(bcl, bcr, bco []fr.Element, proof *Proof, srs *kzg.SRS) error {
+	n := runtime.NumCPU()
+	var err0, err1, err2 error
+	chCommit0 := make(chan struct{}, 1)
+	chCommit1 := make(chan struct{}, 1)
+	go func() {
+		proof.LRO[0], err0 = kzg.Commit(bcl, srs, n)
+		close(chCommit0)
+	}()
+	go func() {
+		proof.LRO[1], err1 = kzg.Commit(bcr, srs, n)
+		close(chCommit1)
+	}()
+	if proof.LRO[2], err2 = kzg.Commit(bco, srs, n); err2 != nil {
+		return err2
+	}
+	<-chCommit0
+	<-chCommit1
+
+	if err0 != nil {
+		return err0
+	}
+
+	return err1
+}
+
+func _commitToLRO(bcl, bcr, bco []fr.Element, proof *Proof, srs *kzg.SRS) error {
 	n := 1
 	var err0, err1, err2 error
 	proof.LRO[0], err0 = kzg.Commit(bcl, srs, n)
