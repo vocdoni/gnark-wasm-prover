@@ -60,9 +60,19 @@ func Prove(spr *constraint.SparseR1CS, pk *ProvingKey, fullWitness *witness.Witn
 		return nil, err
 	}
 	solution := _solution.(*constraint.SparseR1CSSolution)
-	evaluationLDomainSmall := []fr.Element(solution.L)
-	evaluationRDomainSmall := []fr.Element(solution.R)
-	evaluationODomainSmall := []fr.Element(solution.O)
+
+	//evaluationLDomainSmall := []fr.Element(solution.L)
+	//evaluationRDomainSmall := []fr.Element(solution.R)
+	//evaluationODomainSmall := []fr.Element(solution.O)
+	// Changed to preallocate memory for evaluationLDomainSmall, evaluationRDomainSmall, and evaluationODomainSmall
+	evaluationLDomainSmall := make([]fr.Element, len(solution.L), len(solution.L))
+	evaluationRDomainSmall := make([]fr.Element, len(solution.R), len(solution.R))
+	evaluationODomainSmall := make([]fr.Element, len(solution.O), len(solution.O))
+
+	// Use copy function to avoid using append
+	copy(evaluationLDomainSmall, solution.L)
+	copy(evaluationRDomainSmall, solution.R)
+	copy(evaluationODomainSmall, solution.O)
 
 	lagReg := iop.Form{Basis: iop.Lagrange, Layout: iop.Regular}
 	liop := iop.NewPolynomial(&evaluationLDomainSmall, lagReg)

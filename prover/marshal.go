@@ -15,6 +15,8 @@
 package prover
 
 import (
+	"fmt"
+
 	curve "github.com/vocdoni/gnark-crypto-bn254/ecc/bn254"
 
 	"errors"
@@ -139,23 +141,27 @@ func (pk *ProvingKey) WriteTo(w io.Writer) (n int64, err error) {
 
 // ReadFrom reads from binary representation in r into ProvingKey
 func (pk *ProvingKey) ReadFrom(r io.Reader) (int64, error) {
+	fmt.Println("reading verification key")
 	pk.Vk = &VerifyingKey{}
 	n, err := pk.Vk.ReadFrom(r)
 	if err != nil {
 		return n, err
 	}
-
+	fmt.Println("reading domain 0")
 	n2, err := pk.Domain[0].ReadFrom(r)
 	n += n2
 	if err != nil {
 		return n, err
 	}
 
+	fmt.Println("reading domain 1")
 	n2, err = pk.Domain[1].ReadFrom(r)
 	n += n2
 	if err != nil {
 		return n, err
 	}
+
+	fmt.Println("reading permutation")
 
 	pk.Permutation = make([]int64, 3*pk.Domain[0].Cardinality)
 
@@ -173,14 +179,16 @@ func (pk *ProvingKey) ReadFrom(r io.Reader) (int64, error) {
 		&pk.Permutation,
 	}
 
+	fmt.Println("reading permutation")
 	for _, v := range toDecode {
 		if err := dec.Decode(v); err != nil {
 			return n + dec.BytesRead(), err
 		}
 	}
 
+	fmt.Println("computing lagrange coset polys")
 	pk.computeLagrangeCosetPolys()
-
+	fmt.Println("done")
 	return n + dec.BytesRead(), nil
 
 }
