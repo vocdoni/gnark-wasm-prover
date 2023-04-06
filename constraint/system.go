@@ -202,6 +202,7 @@ func (system *System) AddSolverHint(f solver.Hint, input []LinearExpression, nbO
 
 	// register the hint as dependency
 	hintUUID, hintID := solver.GetHintID(f), solver.GetHintName(f)
+	fmt.Printf("AddSolverHint tried to register hint %s %x\n", hintID, hintUUID)
 	if id, ok := system.MHintsDependencies[hintUUID]; ok {
 		// hint already registered, let's ensure string id matches
 		if id != hintID {

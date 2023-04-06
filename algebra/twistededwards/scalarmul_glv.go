@@ -77,7 +77,8 @@ var DecomposeScalar = func(scalarField *big.Int, inputs []*big.Int, res []*big.I
 }
 
 func init() {
-	solver.RegisterHint(DecomposeScalar)
+	// DUMMY NAME; SHOULD BE FIXED
+	solver.RegisterHint(DecomposeScalar, "decomposeScalar")
 }
 
 // ScalarMul computes the scalar multiplication of a point on a twisted Edwards curve

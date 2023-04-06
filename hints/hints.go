@@ -1,6 +1,7 @@
 package hints
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/vocdoni/gnark-wasm-prover/constraint/solver"
@@ -19,32 +20,12 @@ func RegisterHints() {
 }
 
 func registerHints() {
-	toRegister := map[solver.HintID]solver.Hint{
-		solver.GetHintID(bits.NTrits):            bits.NTrits,
-		solver.GetHintID(bits.NNAF):              bits.NNAF,
-		solver.GetHintID(bits.IthBit):            bits.IthBit,
-		solver.GetHintID(bits.NBits):             bits.NBits,
-		solver.GetHintID(selector.MuxIndicators): selector.MuxIndicators,
-		solver.GetHintID(selector.MapIndicators): selector.MapIndicators,
-		solver.GetHintID(solver.InvZeroHint):     solver.InvZeroHint,
-	}
-
 	// note that importing these packages may already trigger a call to solver.RegisterHint(...)
-	currentHintsIDS := []solver.HintID{}
-	for _, hint := range solver.GetRegisteredHints() {
-		currentHintsIDS = append(currentHintsIDS, solver.GetHintID(hint))
-	}
+	solver.RegisterHint(bits.NTrits, fmt.Sprintf("%s/bits.NTrits", solver.MathHintPrefix))
+	solver.RegisterHint(bits.NNAF, fmt.Sprintf("%s/bits.NNAF", solver.MathHintPrefix))
+	solver.RegisterHint(bits.IthBit, fmt.Sprintf("%s/bits.IthBit", solver.MathHintPrefix))
+	solver.RegisterHint(bits.NBits, fmt.Sprintf("%s/bits.NBits", solver.MathHintPrefix))
+	solver.RegisterHint(selector.MuxIndicators, fmt.Sprintf("%s/selector.MuxIndicators", solver.MathHintPrefix))
+	solver.RegisterHint(selector.MapIndicators, fmt.Sprintf("%s/selector.MapIndicators", solver.MathHintPrefix))
 
-	for newHintID, newHint := range toRegister {
-		alreadyRegistered := false
-		for _, hintID := range currentHintsIDS {
-			if hintID == newHintID {
-				alreadyRegistered = true
-			}
-		}
-
-		if !alreadyRegistered {
-			solver.RegisterHint(newHint)
-		}
-	}
 }

@@ -85,6 +85,7 @@ type HintID uint32
 // the hint function hintFn to register a hint function in the package registry.
 type Hint func(field *big.Int, inputs []*big.Int, outputs []*big.Int) error
 
+// NOT USED
 // GetHintID is a reference function for computing the hint ID based on a function name
 func GetHintID(fn Hint) HintID {
 	hf := fnv.New32a()
@@ -109,6 +110,7 @@ func GetHintID(fn Hint) HintID {
 	return HintID(hf.Sum32())
 }
 
+// NOT USED
 func GetHintName(fn Hint) string {
 	fnptr := reflect.ValueOf(fn).Pointer()
 	return runtime.FuncForPC(fnptr).Name()

@@ -52,7 +52,10 @@ func newSolution(cs *constraint.System, nbWires int, hintFunctions map[solver.Hi
 	var missing []string
 	for hintUUID, hintID := range cs.MHintsDependencies {
 		if _, ok := s.mHintsFunctions[hintUUID]; !ok {
+			fmt.Printf("missing hint %x %s\n", hintUUID, hintID)
 			missing = append(missing, hintID)
+		} else {
+			fmt.Printf("found hint %x %s\n", hintUUID, hintID)
 		}
 	}
 

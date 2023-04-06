@@ -13,7 +13,7 @@ import (
 var NNAF = nNaf
 
 func init() {
-	solver.RegisterHint(NNAF)
+	solver.RegisterHint(NNAF, solver.MathHintPrefix+"/bits.NNAF")
 }
 
 // ToNAF returns the NAF decomposition of given input.

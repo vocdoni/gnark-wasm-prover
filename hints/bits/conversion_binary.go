@@ -1,6 +1,7 @@
 package bits
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/vocdoni/gnark-wasm-prover/constraint/solver"
@@ -9,8 +10,8 @@ import (
 
 func init() {
 	// register hints
-	solver.RegisterHint(IthBit)
-	solver.RegisterHint(NBits)
+	solver.RegisterHint(IthBit, fmt.Sprintf("%s/bits.IthBit", solver.MathHintPrefix))
+	solver.RegisterHint(NBits, fmt.Sprintf("%s/bits.NBits", solver.MathHintPrefix))
 }
 
 // ToBinary is an alias of ToBase(api, Binary, v, opts)
